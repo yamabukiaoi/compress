@@ -1,0 +1,345 @@
+<html>
+<head>
+  <title> Notification </title>
+  <meta charset="utf-8">
+  <style>
+	ul,li{
+		margin:0;
+		padding:0;
+		cursor:default;
+	}
+	.flex{
+		display:flex;
+	}
+	.flex-col{
+		flex-direction: column;
+	}
+	.container{
+		border:1px solid #ccc;
+	}
+	.path-list{
+		list-style:none;
+		border:1px solid #ccc;
+		width:200px;
+		height:300px;
+		overflow-y:auto;
+	}
+	.path-list>li{
+		width:100%;
+		overflow:hidden;
+		white-space:nowrap;
+		cursor:pointer;
+		line-height:22px;
+	}
+	.focus{
+		background:#ccc;
+		color:#333;
+	}
+	.hover{
+		overflow:visible !important;
+	}
+	.unselect{
+		-webkit-user-select:none;
+	}
+	.compress-list{
+		list-style:none;
+		border:1px solid #ccc;
+		width:200px;
+		height:300px;
+		overflow-y:auto;
+	}
+	.icon-right{
+		display:inline-block;
+		border-left:10px solid #aaa;
+		border-top:6px solid transparent;
+		border-bottom:6px solid transparent;
+		margin:0 4px;
+	}
+	.icon-bottom{
+		display:inline-block;
+		border-top:10px solid #aaa;
+		border-left:6px solid transparent;
+		border-right:6px solid transparent;
+		margin:0 3px;
+	}
+	.file{
+		padding-left:18px;
+	}
+	.child-lsit{
+		list-style:none;
+		padding-left:15px;
+		background:#fff;
+	}
+	.btn{
+		
+	}
+  </style>
+</head>
+<body style="background-color:rgba(0,0,0,0);">
+<p>一键压缩demo</p>
+<button id="compress">压缩</button>
+<input type="text" id="path">
+<button id="read">读取</button>
+<div class="container unselect flex">
+	<ul class="path-list" id="path-list">
+	</ul>
+	<div class="btn-group flex flex-col" id="btn-group">
+		<button class="btn" data-type="add">添加</button>
+		<button class="btn" data-type="delete">删除</button>
+		<button class="btn" data-type="deleteAll">清空</button>
+	</div>
+	<ul class="compress-list" id="compress-list">
+		
+	</ul>
+</div>
+<script>
+	'use strict';
+	var fs = require('fs');
+	var _path = require('path');
+	var os = require('os');
+	var cmd = require('node-cmd');
+	var basePath = document.getElementById('path');
+	var read = document.getElementById('read');
+	var pathList = document.getElementById('path-list');
+	var arr = null;
+	var shift = false;
+	var ctrl = false;
+	var targetNum = 0;
+	var selectArray = [];
+	var btnGroup = document.getElementById('btn-group');
+	var compressList = document.getElementById('compress-list');
+	var compress = document.getElementById('compress');
+	var savePath = os.homedir() + '\\Desktop\\min';
+	var gui = require('nw.gui');
+	var yuiCompressPath = gui.__dirname + '/yuicompressor-2.4.8.jar';
+	read.onclick = function (){
+		var path = document.getElementById('path');
+		readDir(path.value, function (files){
+			initFileBox(path.value, pathList, files);
+			initEvent();
+		})
+	}
+	btnGroup.onclick = function (e){
+		if(e.target.dataset.type === 'add'){
+			var list = document.querySelectorAll('#path-list .focus');
+			var targetList = compressList.children;
+			var html = '';
+			if(targetList.length === 0){
+				for(var i = 0, len = list.length; i < len; i++){
+					if(list[i].dataset.type === 'folder') continue;
+					html += '<li data-path="' + list[i].dataset.path + '">' + list[i].innerHTML + '</li>'
+				}
+				compressList.innerHTML = html;
+			}else{
+				for(var i = 0, leni = list.length; i < leni; ++i){
+					for(var j = 0, lenj = targetList.length; j < lenj; ++j){
+						if(list[i].dataset.path === targetList[j].dataset.path) break;
+					}
+					if(j === targetList.length){
+						var li = document.createElement('li');
+						li.innerHTML = list[i].innerHTML;
+						li.setAttribute('data-path', list[i].dataset.path);
+						compressList.appendChild(li);
+					}
+				}
+			}
+		}else if(e.target.dataset.type === 'delete'){
+			var targetList = compressList.children;
+		}else if(e.target.dataset.type === 'deleteAll'){
+			compressList.innerHTML = '';
+		}
+	}
+	var readDir = function (path, callback, errCallback){
+		fs.readdir(path, (err, files) => {
+			if(err && errCallback) errCallback(path);
+			else callback(files);
+		})
+	}
+	var checkDir = function (basePath, path, mark){
+		//nodejs异步操作不能直接跟for循环连用
+		function rd (mark, i){
+			setTimeout(function (mark){
+				fs.readdir(mark, function (err){
+					console.log(mark);
+					if(err)
+					fs.mkdir(mark)
+				})
+			}, i * 10, mark)
+		}
+		console.log(basePath);
+		console.log(path);
+		var arr = path.split('\\');
+		console.dir(arr);
+		mark = mark + basePath;
+
+		for(let i = 1, len = arr.length; i < len - 1; i++){
+			mark += '\\' + arr[i];
+			rd(mark, i);
+		}
+
+	}
+	document.onkeydown = function (e){
+		if(shift || ctrl) return;
+		if(e.which === 16){
+			shift = true;
+			for(var i = 0, len = arr.length; i < len; i++){
+				if(arr[i].classList.contains('focus')){
+					targetNum = i;
+					break;
+				}
+			}
+		}
+		if(e.which === 17){
+			ctrl = true;
+		}
+	}
+	document.onkeyup = function (){
+		shift = false;
+		ctrl = false;
+	}
+
+	var initFileBox = function (path, parentNode, files){
+		var html = '';
+		var i = 0;
+		files.forEach(function (v){
+			if(_path.extname(path + '\\' + v) === '') html += '<li data-num="' + i + '" data-path="' + path + '\\' + v + '" data-type="folder"><span class="icon-right"></span>' + v + '</li>';
+			else html += '<li data-num="' + i + '" data-path="' + path + '\\' + v + '" class="file">' + v + '</li>';
+			i++;
+		})
+		parentNode.innerHTML = html;
+	}
+	
+	var initEvent = function (){
+		pathList.onclick = function (e){
+			arr = pathList.children;
+			if(e.target.nodeName.toLowerCase() === 'span'){
+				if(e.target.classList.contains('icon-right')){
+					e.target.className = 'icon-bottom';
+					var ul = document.createElement('ul');
+					ul.className = 'child-lsit';
+					e.target.parentElement.appendChild(ul);
+					var path = e.target.parentElement.dataset.path;
+					readDir(e.target.parentElement.dataset.path, function (files){
+						initFileBox(path, e.target.parentElement.lastChild, files);
+						initEvent();
+					})
+				}else{
+					e.target.className = 'icon-right';
+					e.target.parentElement.lastChild.outerHTML = '';
+				}
+			}
+			if(ctrl){
+				e.target.classList.contains('focus') ? e.target.classList.remove('focus') : e.target.classList.add('focus');
+			}else{
+				var n = parseInt(e.target.dataset.num);
+				clearFocus(pathList);
+				if(e.target.nodeName.toLowerCase() === 'li'){
+					e.target.classList.add('focus');
+				}
+				if(shift === true){
+					if(n === targetNum) return;
+					else if(n < targetNum){
+						for(; n <= targetNum; n++){
+							arr[n].classList.add('focus');
+						}
+					}else{
+						for(; n >= targetNum; n--){
+							arr[n].classList.add('focus');
+						}
+					}
+				}
+			}
+			function clearFocus(parentNode){
+				var arr = parentNode.children;
+				for(var i = 0, len = arr.length; i < len; i++){
+					if(arr[i].classList.contains('focus')){
+						arr[i].classList.remove('focus');
+					}
+					if(arr[i].lastChild.nodeName.toLowerCase() === 'ul'){
+						clearFocus(arr[i].lastChild);
+					}
+				}
+			}
+		}
+		pathList.onmouseover = function (e){
+			if(e.target.nodeName.toLowerCase() === 'li'){
+				e.target.classList.add('hover');
+			}
+		}
+		pathList.onmouseout = function (e){
+			if(e.target.nodeName.toLowerCase() === 'li'){
+				e.target.classList.remove('hover');
+			}
+		}
+		compressList.onclick = function (e){
+			arr = compressList.children;
+			if(ctrl){
+				e.target.classList.contains('focus') ? e.target.classList.remove('focus') : e.target.classList.add('focus');
+			}else{
+				var n = calcPos(e, compressList);
+				console.log(n);
+				clearFocus(compressList);
+				if(e.target.nodeName.toLowerCase() === 'li'){
+					e.target.classList.add('focus');
+				}
+				if(shift === true){
+					if(n === targetNum) return;
+					else if(n < targetNum){
+						for(; n <= targetNum; n++){
+							arr[n].classList.add('focus');
+						}
+					}else{
+						for(; n >= targetNum; n--){
+							arr[n].classList.add('focus');
+						}
+					}
+				}
+			}
+			function calcPos(e, parentNode){
+				var arr = parentNode.children;
+				for(var i = 0, len = arr.length; i < len; i++){
+					if(e.target.dataset.path === arr[i].dataset.path){
+						return i;
+					}
+				}
+			}
+			function clearFocus(parentNode){
+				var arr = parentNode.children;
+				for(var i = 0, len = arr.length; i < len; i++){
+					if(arr[i].classList.contains('focus')){
+						arr[i].classList.remove('focus');
+					}
+					if(arr[i].lastChild.nodeName.toLowerCase() === 'ul'){
+						clearFocus(arr[i].lastChild);
+					}
+				}
+			}
+		}
+	}
+	compress.onclick = function (e){
+		console.log('compress');
+		var arr = compressList.children;
+		if(arr.length === 0) return;
+		var filePath = [];
+		var path = basePath.value;
+		var jar = 'java -jar ' + yuiCompressPath;
+		for(var i = 0, len = arr.length; i < len; i++){
+			filePath.push({
+				fileName: arr[i].dataset.path,
+				fileNameMin: arr[i].dataset.path.replace(path, '')
+			})
+		}
+		console.dir(filePath);
+		for(var i = 0; i < filePath.length; i++){
+			checkDir(savePath, filePath[i].fileNameMin, '');
+		}
+		for(var i = 0; i < filePath.length; i++){
+			setTimeout(function (jar, filePath, i){
+				var command = jar + ' ' + filePath[i].fileName + ' > ' + savePath + filePath[i].fileNameMin;
+				cmd.run(command);
+			}, i * 100, jar, filePath, i)
+		}
+	}
+</script>  
+</body>
+</html>
